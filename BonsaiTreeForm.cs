@@ -51,9 +51,9 @@ namespace BonsaiTreeGenerator
         private char[,]? currentTree;
         private Dictionary<char, Color>? colorMapping;
         private BonsaiStats? currentStats;
-        
+
         // Rain effect
-        private Timer? rainTimer;
+        private System.Windows.Forms.Timer? rainTimer;
         private List<RainDrop>? rainDrops;
         private int rainFrameCount = 0;
         
@@ -568,7 +568,7 @@ namespace BonsaiTreeGenerator
             try
             {
                 if (treeDisplay == null || treeDisplay.IsDisposed) return;
-                
+
                 // Initialize rain drops
                 rainDrops = new List<RainDrop>();
                 for (int i = 0; i < 30; i++)
@@ -580,12 +580,12 @@ namespace BonsaiTreeGenerator
                         Speed = random.Next(1, 3)
                     });
                 }
-                
+
                 rainFrameCount = 0;
-                
-                // Start rain timer
+
+                // Start rain timer - using Windows Forms Timer
                 rainTimer?.Dispose();
-                rainTimer = new Timer();
+                rainTimer = new System.Windows.Forms.Timer();
                 rainTimer.Interval = 100; // 100ms for smooth animation
                 rainTimer.Tick += RainTimer_Tick;
                 rainTimer.Start();
@@ -905,7 +905,7 @@ namespace BonsaiTreeGenerator
             {
                 if (statusLabel != null && !statusLabel.IsDisposed && statusLabel.IsHandleCreated)
                 {
-                    statusLabel.Text = "Generated on: 2025-06-23 01:16:31 UTC for user: cs121287";
+                    statusLabel.Text = "Generated on: 2025-06-23 01:34:31 UTC";
                 }
             });
         }

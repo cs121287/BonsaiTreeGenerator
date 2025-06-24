@@ -12,21 +12,23 @@ namespace BonsaiTreeGenerator
 {
     /// <summary>
     /// Main form for the Realistic Procedural 2D Bonsai Tree Generator
-    /// Maximized window with proper sizing and bonsai stats
+    /// Professional UI with clean layout and consistent font sizing
+    /// Using improved 3-step process with wavy S-shaped trunk and branches
     /// </summary>
     public partial class BonsaiTreeForm : Form
     {
         #region Private Fields
-        
+
         // Core components
         private readonly Random random = new();
         private readonly BonsaiTreeGenerator treeGenerator;
         private readonly object lockObject = new();
-        
+
         // UI Components
         private TableLayoutPanel? mainContainer;
         private Panel? treePanel;
         private Panel? statsPanel;
+        private Panel? buttonPanel;
         private RichTextBox? treeDisplay;
         private RichTextBox? statsDisplay;
         private Button? generateButton;
@@ -35,28 +37,31 @@ namespace BonsaiTreeGenerator
         private Button? killButton;
         private Label? statusLabel;
         private ProgressBar? progressBar;
-        
+
         // Configuration constants
         private const int TREE_WIDTH = 90;
         private const int TREE_HEIGHT = 35;
-        private const int MAX_GENERATION_TIME_MS = 10000; // 10 seconds timeout
-        
+        private const int MAX_GENERATION_TIME_MS = 100000; // 100 seconds timeout
+
         // Threading and state management
         private CancellationTokenSource cancellationTokenSource = new();
         private volatile bool isGenerating = false;
         private volatile bool isFormReady = false;
         private bool disposed = false;
-        
+
         // Current tree data
         private char[,]? currentTree;
-        private Dictionary<char, Color>? colorMapping;
+        private readonly Dictionary<char, Color>? colorMapping;
         private BonsaiStats? currentStats;
 
-        // Rain effect
+        // Enhanced rain effect
         private System.Windows.Forms.Timer? rainTimer;
         private List<RainDrop>? rainDrops;
         private int rainFrameCount = 0;
-        
+        private readonly int RAIN_DROP_COUNT = 120; // Doubled for more dramatic effect
+        private readonly int RAIN_INTERVAL = 50; // Faster animation - reduced from 100ms to 50ms
+        private readonly int RAIN_DURATION_FRAMES = 10; // Longer duration - increased from 10 to 40 frames
+
         #endregion
 
         #region Constructor and Form Setup
@@ -66,16 +71,22 @@ namespace BonsaiTreeGenerator
             try
             {
                 treeGenerator = new BonsaiTreeGenerator(random);
-                colorMapping = treeGenerator.GetColorMapping();
-                
+                colorMapping = BonsaiTreeGenerator.GetColorMapping();
+
                 InitializeComponent();
                 SetupUserInterface();
-                
-                // Enable double buffering for smooth rendering
-                SetStyle(ControlStyles.AllPaintingInWmPaint | 
-                        ControlStyles.UserPaint | 
-                        ControlStyles.DoubleBuffer | 
-                        ControlStyles.ResizeRedraw, true);
+
+                // Enable double buffering for smooth rendering and reduce flicker
+                SetStyle(ControlStyles.AllPaintingInWmPaint |
+                        ControlStyles.UserPaint |
+                        ControlStyles.DoubleBuffer |
+                        ControlStyles.ResizeRedraw |
+                        ControlStyles.OptimizedDoubleBuffer, true);
+
+                // Reduce flicker during updates
+                typeof(Control).InvokeMember("DoubleBuffered",
+                    System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                    null, this, [true]);
             }
             catch (Exception ex)
             {
@@ -87,13 +98,13 @@ namespace BonsaiTreeGenerator
         {
             try
             {
-                Text = "Realistic Procedural 2D Bonsai Tree Generator - Interactive Pet Edition";
-                
+                Text = "Personal Bonsai Tree Generator - The Only Friends You Have Left!";
+
                 // Start maximized
                 WindowState = FormWindowState.Maximized;
                 StartPosition = FormStartPosition.CenterScreen;
-                BackColor = Color.FromArgb(240, 240, 235);
-                
+                BackColor = Color.FromArgb(248, 249, 250);
+
                 CreateMainLayout();
                 CreateTreeDisplay();
                 CreateStatsPanel();
@@ -108,7 +119,7 @@ namespace BonsaiTreeGenerator
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            
+
             try
             {
                 isFormReady = true;
@@ -127,14 +138,15 @@ namespace BonsaiTreeGenerator
         private void CreateMainLayout()
         {
             mainContainer?.Dispose();
-            
+
             mainContainer = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 2,
-                BackColor = Color.FromArgb(240, 240, 235),
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.None
+                BackColor = Color.FromArgb(248, 249, 250),
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None,
+                Padding = new Padding(12)
             };
 
             // Configure column styles - tree takes more space
@@ -142,8 +154,8 @@ namespace BonsaiTreeGenerator
             mainContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F)); // Stats area
 
             // Configure row styles
-            mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 90F)); // Main content
-            mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 10F));  // Controls
+            mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 88F)); // Main content
+            mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 12F));  // Controls
 
             Controls.Add(mainContainer);
         }
@@ -153,43 +165,61 @@ namespace BonsaiTreeGenerator
             if (mainContainer == null) return;
 
             treePanel?.Dispose();
-            
+
             treePanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.Black,
-                BorderStyle = BorderStyle.FixedSingle,
-                Margin = new Padding(10),
-                AutoScroll = false // No scroll bars as requested
+                BorderStyle = BorderStyle.None,
+                Margin = new Padding(0, 0, 6, 0),
+                AutoScroll = false,
+                Padding = new Padding(2)
             };
 
-            // Create the main tree display using RichTextBox with no scroll bars
+            // Add subtle shadow effect
+            treePanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, treePanel.ClientRectangle,
+                    Color.FromArgb(200, 200, 200), 1, ButtonBorderStyle.Solid,
+                    Color.FromArgb(200, 200, 200), 1, ButtonBorderStyle.Solid,
+                    Color.FromArgb(200, 200, 200), 1, ButtonBorderStyle.Solid,
+                    Color.FromArgb(200, 200, 200), 1, ButtonBorderStyle.Solid);
+            };
+
+            // Create the main tree display using RichTextBox with enhanced double buffering
             treeDisplay?.Dispose();
             treeDisplay = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                Font = new Font("Consolas", 8F, FontStyle.Regular), // Smaller font to fit without scrolling
+                Font = new Font("Consolas", 9F, FontStyle.Regular),
                 BackColor = Color.Black,
                 ForeColor = Color.White,
                 BorderStyle = BorderStyle.None,
-                ScrollBars = RichTextBoxScrollBars.None, // No scroll bars
+                ScrollBars = RichTextBoxScrollBars.None,
                 WordWrap = false,
                 DetectUrls = false,
                 EnableAutoDragDrop = false,
-                HideSelection = false
+                HideSelection = false,
+                Margin = new Padding(8)
             };
 
-            // Create tree title
+            // Enable double buffering for the tree display to reduce flicker
+            typeof(Control).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null, treeDisplay, [true]);
+
+            // Create tree title - removed emoji
             var treeTitle = new Label
             {
-                Text = "🌳 YOUR INTERACTIVE BONSAI PET 🌳",
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(101, 67, 33),
+                Text = "YOUR PERSONAL BONSAI TREE",
+                Font = new Font("Segoe UI", 22F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Top,
-                Height = 40,
-                BackColor = Color.FromArgb(245, 245, 240)
+                Height = 55,
+                BackColor = Color.FromArgb(236, 240, 241),
+                Padding = new Padding(0, 12, 0, 0)
             };
 
             // Create progress bar
@@ -197,10 +227,10 @@ namespace BonsaiTreeGenerator
             progressBar = new ProgressBar
             {
                 Dock = DockStyle.Bottom,
-                Height = 8,
+                Height = 6,
                 Style = ProgressBarStyle.Continuous,
                 Visible = false,
-                ForeColor = Color.FromArgb(34, 139, 34)
+                ForeColor = Color.FromArgb(46, 204, 113)
             };
 
             treePanel.Controls.AddRange([treeDisplay, progressBar, treeTitle]);
@@ -211,90 +241,112 @@ namespace BonsaiTreeGenerator
         {
             if (mainContainer == null) return;
 
+            var statsContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                Margin = new Padding(6, 0, 0, 0)
+            };
+
+            // Stats display panel
             statsPanel?.Dispose();
-            
             statsPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(248, 246, 243),
-                BorderStyle = BorderStyle.FixedSingle,
-                Margin = new Padding(5),
-                AutoScroll = true
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                Padding = new Padding(2)
             };
 
+            // Add subtle border
+            statsPanel.Paint += (s, e) =>
+            {
+                ControlPaint.DrawBorder(e.Graphics, statsPanel.ClientRectangle,
+                    Color.FromArgb(220, 220, 220), 1, ButtonBorderStyle.Solid,
+                    Color.FromArgb(220, 220, 220), 1, ButtonBorderStyle.Solid,
+                    Color.FromArgb(220, 220, 220), 1, ButtonBorderStyle.Solid,
+                    Color.FromArgb(220, 220, 220), 1, ButtonBorderStyle.Solid);
+            };
+
+            // Stats title - removed emoji
             var statsTitle = new Label
             {
-                Text = "🎋 YOUR BONSAI'S STATS",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(101, 67, 33),
+                Text = "BONSAI STATS",
+                Font = new Font("Segoe UI", 22F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Top,
-                Height = 40,
-                BackColor = Color.FromArgb(240, 235, 230)
+                Height = 55,
+                BackColor = Color.FromArgb(236, 240, 241),
+                Padding = new Padding(0, 12, 0, 0)
             };
 
+            statsDisplay?.Dispose();
             statsDisplay = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                BackColor = Color.FromArgb(248, 246, 243),
+                BackColor = Color.White,
                 BorderStyle = BorderStyle.None,
-                Font = new Font("Segoe UI", 10F),
+                Font = new Font("Segoe UI", 13F), // Increased font size from 10F to 13F
                 DetectUrls = false,
                 EnableAutoDragDrop = false,
-                Margin = new Padding(10, 10, 10, 100) // Space for buttons at bottom
+                Padding = new Padding(16, 12, 16, 12)
             };
 
-            // Create Water button
+            // Create button panel below stats
+            buttonPanel?.Dispose();
+            buttonPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 120,
+                BackColor = Color.White,
+                Padding = new Padding(16, 8, 16, 16)
+            };
+
+            // Create Water button - removed emoji
             waterButton?.Dispose();
             waterButton = new Button
             {
-                Text = "💧 Water Your Bonsai",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Size = new Size(200, 40),
-                BackColor = Color.FromArgb(34, 139, 34),
+                Text = "Water Your Bonsai",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Size = new Size(0, 40),
+                Dock = DockStyle.Top,
+                BackColor = Color.FromArgb(46, 204, 113),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                Location = new Point(10, statsPanel.Height - 90)
+                Margin = new Padding(0, 0, 0, 8)
             };
-            waterButton.FlatAppearance.BorderColor = Color.FromArgb(0, 100, 0);
+            waterButton.FlatAppearance.BorderSize = 0;
+            waterButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(39, 174, 96);
             waterButton.Click += WaterButton_Click;
 
             // Create Kill button
             killButton?.Dispose();
             killButton = new Button
             {
-                Text = "💀 Kill Your Bonsai",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Size = new Size(200, 40),
-                BackColor = Color.FromArgb(139, 34, 34),
+                Text = "Kill Your Bonsai",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Size = new Size(0, 40),
+                Dock = DockStyle.Bottom,
+                BackColor = Color.FromArgb(231, 76, 60),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                Location = new Point(10, statsPanel.Height - 45)
+                Margin = new Padding(0, 8, 0, 0)
             };
-            killButton.FlatAppearance.BorderColor = Color.FromArgb(100, 0, 0);
+            killButton.FlatAppearance.BorderSize = 0;
+            killButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(192, 57, 43);
             killButton.Click += KillButton_Click;
 
-            statsPanel.Controls.AddRange([statsDisplay, waterButton, killButton, statsTitle]);
-            
-            // Adjust button positions when panel resizes
-            statsPanel.Resize += (s, e) => {
-                if (waterButton != null && killButton != null)
-                {
-                    waterButton.Location = new Point(10, statsPanel.Height - 95);
-                    waterButton.Size = new Size(statsPanel.Width - 25, 40);
-                    killButton.Location = new Point(10, statsPanel.Height - 50);
-                    killButton.Size = new Size(statsPanel.Width - 25, 40);
-                }
-            };
-            
-            mainContainer.Controls.Add(statsPanel, 1, 0);
+            buttonPanel.Controls.AddRange([waterButton, killButton]);
+            statsPanel.Controls.AddRange([statsDisplay, buttonPanel, statsTitle]);
+            statsContainer.Controls.Add(statsPanel);
+
+            mainContainer.Controls.Add(statsContainer, 1, 0);
         }
 
         private void CreateControlPanel()
@@ -304,53 +356,63 @@ namespace BonsaiTreeGenerator
             var controlPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(235, 235, 230),
-                BorderStyle = BorderStyle.FixedSingle,
-                Margin = new Padding(10, 5, 10, 10)
+                BackColor = Color.FromArgb(236, 240, 241),
+                BorderStyle = BorderStyle.None,
+                Margin = new Padding(0, 8, 0, 0),
+                Padding = new Padding(16, 12, 16, 12)
             };
 
-            // Generate Tree button
+            // Add subtle top border
+            controlPanel.Paint += (s, e) =>
+            {
+                using var pen = new Pen(Color.FromArgb(189, 195, 199), 1);
+                e.Graphics.DrawLine(pen, 0, 0, controlPanel.Width, 0);
+            };
+
+            // Generate Tree button - removed emoji
             generateButton?.Dispose();
             generateButton = new Button
             {
-                Text = "🌱 Adopt New Bonsai",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                Size = new Size(220, 45),
-                Location = new Point(20, 15),
-                BackColor = Color.FromArgb(34, 139, 34),
+                Text = "Adopt New Bonsai",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Size = new Size(200, 45),
+                Location = new Point(16, 12),
+                BackColor = Color.FromArgb(46, 204, 113),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false
             };
-            generateButton.FlatAppearance.BorderColor = Color.FromArgb(0, 100, 0);
+            generateButton.FlatAppearance.BorderSize = 0;
+            generateButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(39, 174, 96);
             generateButton.Click += GenerateButton_Click;
 
-            // Save Tree button
+            // Save Tree button - removed emoji
             saveButton?.Dispose();
             saveButton = new Button
             {
-                Text = "💾 Save Bonsai",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Text = "Save Bonsai",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Size = new Size(160, 45),
-                Location = new Point(260, 15),
-                BackColor = Color.FromArgb(101, 67, 33),
+                Location = new Point(232, 12),
+                BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false
             };
-            saveButton.FlatAppearance.BorderColor = Color.FromArgb(83, 53, 20);
+            saveButton.FlatAppearance.BorderSize = 0;
+            saveButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(41, 128, 185);
             saveButton.Click += SaveButton_Click;
 
             // Status label with updated timestamp
             statusLabel?.Dispose();
             statusLabel = new Label
             {
-                Text = "Generated on: 2025-06-23 01:16:31 UTC for user: cs121287",
-                Font = new Font("Segoe UI", 10F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(105, 105, 105),
-                Location = new Point(450, 25),
+                Text = "C. Saunders - 2025",
+                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(127, 140, 141),
+                Location = new Point(420, 20),
                 Size = new Size(500, 25),
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -367,7 +429,7 @@ namespace BonsaiTreeGenerator
         private async Task GenerateTreeAsync()
         {
             if (!isFormReady || isGenerating) return;
-            
+
             try
             {
                 lock (lockObject)
@@ -380,23 +442,23 @@ namespace BonsaiTreeGenerator
                 cancellationTokenSource?.Cancel();
                 cancellationTokenSource?.Dispose();
                 cancellationTokenSource = new CancellationTokenSource();
-                
+
                 SetUIGenerating(true);
-                
+
                 using var timeoutCts = new CancellationTokenSource(MAX_GENERATION_TIME_MS);
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationTokenSource.Token, timeoutCts.Token);
-                
+
                 // Create progress reporter
                 var progress = new Progress<int>(UpdateProgress);
-                
+
                 // Generate new stats for the bonsai
                 currentStats = new BonsaiStats(random);
-                
-                // Generate the bonsai tree
+
+                // Generate the realistic bonsai tree using improved 3-step wavy process
                 currentTree = await treeGenerator.GenerateTreeAsync(
                     TREE_WIDTH, TREE_HEIGHT, progress, combinedCts.Token);
-                
+
                 if (!combinedCts.Token.IsCancellationRequested && !IsDisposed && isFormReady)
                 {
                     await ApplyTreeToUI(currentTree, combinedCts.Token);
@@ -410,7 +472,7 @@ namespace BonsaiTreeGenerator
             }
             catch (Exception ex)
             {
-                ShowError("Failed to generate bonsai tree", ex);
+                ShowError("Failed to generate realistic bonsai tree using improved 3-step wavy process", ex);
             }
             finally
             {
@@ -425,30 +487,45 @@ namespace BonsaiTreeGenerator
         private async Task ApplyTreeToUI(char[,] tree, CancellationToken cancellationToken)
         {
             if (!isFormReady || treeDisplay == null || treeDisplay.IsDisposed) return;
-            
+
             await Task.Run(() =>
             {
                 SafeInvoke(() =>
                 {
                     if (isFormReady && treeDisplay != null && !treeDisplay.IsDisposed && treeDisplay.IsHandleCreated)
                     {
-                        // Convert tree array to string
-                        var treeText = ConvertTreeToString(tree);
-                        
-                        treeDisplay.Clear();
-                        treeDisplay.Text = treeText;
-                        ApplyColorFormatting();
+                        // Suspend layout to prevent flicker during updates
+                        treeDisplay.SuspendLayout();
+
+                        try
+                        {
+                            // Convert tree array to string
+                            var treeText = ConvertTreeToString(tree);
+
+                            // Clear and set text in one operation
+                            treeDisplay.Clear();
+                            treeDisplay.Text = treeText;
+
+                            // Apply color formatting efficiently
+                            ApplyColorFormattingOptimized();
+                        }
+                        finally
+                        {
+                            // Resume layout and refresh
+                            treeDisplay.ResumeLayout(true);
+                            treeDisplay.Refresh();
+                        }
                     }
                 });
             }, cancellationToken);
         }
 
-        private string ConvertTreeToString(char[,] tree)
+        private static string ConvertTreeToString(char[,] tree)
         {
             var treeText = new StringBuilder();
             int height = tree.GetLength(0);
             int width = tree.GetLength(1);
-            
+
             for (int row = 0; row < height; row++)
             {
                 for (int col = 0; col < width; col++)
@@ -460,7 +537,7 @@ namespace BonsaiTreeGenerator
                     treeText.AppendLine();
                 }
             }
-            
+
             return treeText.ToString();
         }
 
@@ -468,15 +545,15 @@ namespace BonsaiTreeGenerator
         {
             try
             {
-                if (!isFormReady || treeDisplay == null || treeDisplay.IsDisposed || 
+                if (!isFormReady || treeDisplay == null || treeDisplay.IsDisposed ||
                     !treeDisplay.IsHandleCreated || colorMapping == null) return;
-                
+
                 // Set default color (black background)
                 treeDisplay.SelectAll();
                 treeDisplay.SelectionBackColor = Color.Black;
                 treeDisplay.SelectionStart = 0;
-                
-                // Apply corrected bonsai colors to individual characters
+
+                // Apply realistic bonsai colors using improved 3-step wavy process color mapping
                 string text = treeDisplay.Text;
                 for (int i = 0; i < text.Length; i++)
                 {
@@ -488,7 +565,7 @@ namespace BonsaiTreeGenerator
                         treeDisplay.SelectionColor = color;
                     }
                 }
-                
+
                 // Reset selection
                 treeDisplay.SelectionStart = 0;
                 treeDisplay.SelectionLength = 0;
@@ -496,6 +573,57 @@ namespace BonsaiTreeGenerator
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Color formatting error: {ex.Message}");
+            }
+        }
+
+        private void ApplyColorFormattingOptimized()
+        {
+            try
+            {
+                if (!isFormReady || treeDisplay == null || treeDisplay.IsDisposed ||
+                    !treeDisplay.IsHandleCreated || colorMapping == null) return;
+
+                // Set default color (black background)
+                treeDisplay.SelectAll();
+                treeDisplay.SelectionBackColor = Color.Black;
+                treeDisplay.SelectionStart = 0;
+
+                // Apply realistic bonsai colors in optimized batches
+                string text = treeDisplay.Text;
+                var colorRanges = new Dictionary<Color, List<(int start, int length)>>();
+
+                // Group consecutive characters of the same color
+                for (int i = 0; i < text.Length; i++)
+                {
+                    char c = text[i];
+                    if (colorMapping.TryGetValue(c, out Color color))
+                    {
+                        if (!colorRanges.ContainsKey(color))
+                            colorRanges[color] = [];
+
+                        colorRanges[color].Add((i, 1));
+                    }
+                }
+
+                // Apply colors in batches
+                foreach (var kvp in colorRanges)
+                {
+                    Color color = kvp.Key;
+                    foreach (var (start, length) in kvp.Value)
+                    {
+                        treeDisplay.SelectionStart = start;
+                        treeDisplay.SelectionLength = length;
+                        treeDisplay.SelectionColor = color;
+                    }
+                }
+
+                // Reset selection
+                treeDisplay.SelectionStart = 0;
+                treeDisplay.SelectionLength = 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Optimized color formatting error: {ex.Message}");
             }
         }
 
@@ -508,50 +636,66 @@ namespace BonsaiTreeGenerator
             try
             {
                 if (statsDisplay == null || statsDisplay.IsDisposed || currentStats == null) return;
-                
-                statsDisplay.Clear();
-                
-                // Bonsai name
-                statsDisplay.SelectionFont = new Font("Segoe UI", 16F, FontStyle.Bold);
-                statsDisplay.SelectionColor = Color.FromArgb(101, 67, 33);
-                statsDisplay.AppendText($"🌳 {currentStats.Name}\n\n");
-                
-                // Age
-                statsDisplay.SelectionFont = new Font("Segoe UI", 12F, FontStyle.Bold);
-                statsDisplay.SelectionColor = Color.FromArgb(139, 90, 43);
-                statsDisplay.AppendText("Age:\n");
-                statsDisplay.SelectionFont = new Font("Segoe UI", 11F, FontStyle.Regular);
-                statsDisplay.SelectionColor = Color.Black;
-                statsDisplay.AppendText($"{currentStats.Age}\n\n");
-                
-                // Likes
-                statsDisplay.SelectionFont = new Font("Segoe UI", 12F, FontStyle.Bold);
-                statsDisplay.SelectionColor = Color.FromArgb(34, 139, 34);
-                statsDisplay.AppendText("💚 Likes:\n");
-                statsDisplay.SelectionFont = new Font("Segoe UI", 11F, FontStyle.Regular);
-                statsDisplay.SelectionColor = Color.Black;
-                foreach (string like in currentStats.Likes)
+
+                // Suspend layout to prevent flicker
+                statsDisplay.SuspendLayout();
+
+                try
                 {
-                    statsDisplay.AppendText($"• {like}\n");
+                    statsDisplay.Clear();
+
+                    // Center alignment for all stats text
+                    statsDisplay.SelectionAlignment = HorizontalAlignment.Center;
+
+                    // Bonsai name - larger font size and centered
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 18F, FontStyle.Bold); // Increased from 16F
+                    statsDisplay.SelectionColor = Color.FromArgb(52, 73, 94);
+                    statsDisplay.AppendText($"Your Bonsai's Name is {currentStats.Name}\n\n");
+
+                    // Age section - larger font and centered
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 14F, FontStyle.Bold); // Increased from 11F
+                    statsDisplay.SelectionColor = Color.FromArgb(149, 165, 166);
+                    statsDisplay.AppendText("AGE\n");
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 13F, FontStyle.Regular); // Increased from 10F
+                    statsDisplay.SelectionColor = Color.FromArgb(44, 62, 80);
+                    statsDisplay.AppendText($"{currentStats.Age}\n\n");
+
+                    // Likes section - larger font, centered, removed emoji
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 14F, FontStyle.Bold); // Increased from 11F
+                    statsDisplay.SelectionColor = Color.FromArgb(46, 204, 113);
+                    statsDisplay.AppendText("LIKES\n");
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 13F, FontStyle.Regular); // Increased from 10F
+                    statsDisplay.SelectionColor = Color.FromArgb(44, 62, 80);
+                    foreach (string like in currentStats.Likes)
+                    {
+                        // Remove bullet point for cleaner centered look
+                        statsDisplay.AppendText($"{like}\n");
+                    }
+                    statsDisplay.AppendText("\n");
+
+                    // Dislikes section - larger font, centered, removed emoji
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 14F, FontStyle.Bold); // Increased from 11F
+                    statsDisplay.SelectionColor = Color.FromArgb(231, 76, 60);
+                    statsDisplay.AppendText("DISLIKES\n");
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 13F, FontStyle.Regular); // Increased from 10F
+                    statsDisplay.SelectionColor = Color.FromArgb(44, 62, 80);
+                    foreach (string dislike in currentStats.Dislikes)
+                    {
+                        // Remove bullet point for cleaner centered look
+                        statsDisplay.AppendText($"{dislike}\n");
+                    }
+                    statsDisplay.AppendText("\n");
+
+                    // Care instructions - larger font, centered, removed emoji
+                    statsDisplay.SelectionFont = new Font("Segoe UI", 12F, FontStyle.Italic); // Increased from 9F
+                    statsDisplay.SelectionColor = Color.FromArgb(127, 140, 141);
+                    statsDisplay.AppendText("Take good care of your bonsai! Water it regularly and treat it with love.");
                 }
-                statsDisplay.AppendText("\n");
-                
-                // Dislikes
-                statsDisplay.SelectionFont = new Font("Segoe UI", 12F, FontStyle.Bold);
-                statsDisplay.SelectionColor = Color.FromArgb(139, 34, 34);
-                statsDisplay.AppendText("💔 Dislikes:\n");
-                statsDisplay.SelectionFont = new Font("Segoe UI", 11F, FontStyle.Regular);
-                statsDisplay.SelectionColor = Color.Black;
-                foreach (string dislike in currentStats.Dislikes)
+                finally
                 {
-                    statsDisplay.AppendText($"• {dislike}\n");
+                    statsDisplay.ResumeLayout(true);
+                    statsDisplay.Refresh();
                 }
-                statsDisplay.AppendText("\n");
-                
-                // Care instructions
-                statsDisplay.SelectionFont = new Font("Segoe UI", 10F, FontStyle.Italic);
-                statsDisplay.SelectionColor = Color.FromArgb(105, 105, 105);
-                statsDisplay.AppendText("💡 Take good care of your bonsai!\nWater it regularly and avoid doing anything harmful...");
             }
             catch (Exception ex)
             {
@@ -561,7 +705,7 @@ namespace BonsaiTreeGenerator
 
         #endregion
 
-        #region Rain Effect
+        #region Enhanced Rain Effect
 
         private void StartRainEffect()
         {
@@ -569,31 +713,42 @@ namespace BonsaiTreeGenerator
             {
                 if (treeDisplay == null || treeDisplay.IsDisposed) return;
 
-                // Initialize rain drops
-                rainDrops = new List<RainDrop>();
-                for (int i = 0; i < 30; i++)
+                // Initialize dramatic rain drops - doubled the count
+                rainDrops = [];
+                for (int i = 0; i < RAIN_DROP_COUNT; i++)
                 {
                     rainDrops.Add(new RainDrop
                     {
                         X = random.Next(TREE_WIDTH),
-                        Y = random.Next(-10, 0),
-                        Speed = random.Next(1, 3)
+                        Y = random.Next(-20, 0), // Start higher for more dramatic effect
+                        Speed = random.Next(2, 5), // Faster speeds (was 1-3, now 2-5)
+                        Character = GetRandomRainCharacter(), // Varied rain characters
+                        Intensity = random.NextDouble() // For varied visual intensity
                     });
                 }
 
                 rainFrameCount = 0;
 
-                // Start rain timer - using Windows Forms Timer
+                // Start enhanced rain timer - faster animation
                 rainTimer?.Dispose();
-                rainTimer = new System.Windows.Forms.Timer();
-                rainTimer.Interval = 100; // 100ms for smooth animation
+                rainTimer = new System.Windows.Forms.Timer
+                {
+                    Interval = RAIN_INTERVAL // 50ms for quicker, more dramatic animation
+                };
                 rainTimer.Tick += RainTimer_Tick;
                 rainTimer.Start();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Rain effect error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Enhanced rain effect error: {ex.Message}");
             }
+        }
+
+        private char GetRandomRainCharacter()
+        {
+            // Various rain drop characters for more dramatic effect
+            char[] rainChars = ['|', '¦', '│', '┃', '║', '∣', '⎮', '❘'];
+            return rainChars[random.Next(rainChars.Length)];
         }
 
         private void RainTimer_Tick(object? sender, EventArgs e)
@@ -601,17 +756,17 @@ namespace BonsaiTreeGenerator
             try
             {
                 if (rainDrops == null || currentTree == null) return;
-                
+
                 rainFrameCount++;
-                
-                // Stop rain after 1 second (10 frames at 100ms each)
-                if (rainFrameCount >= 10)
+
+                // Longer dramatic rain duration - 40 frames at 50ms each = 2 seconds
+                if (rainFrameCount >= RAIN_DURATION_FRAMES)
                 {
                     rainTimer?.Stop();
                     rainTimer?.Dispose();
                     rainTimer = null;
-                    
-                    // Restore original tree
+
+                    // Restore original tree with optimized rendering
                     if (currentTree != null)
                     {
                         var treeText = ConvertTreeToString(currentTree);
@@ -619,67 +774,138 @@ namespace BonsaiTreeGenerator
                         {
                             if (treeDisplay != null && !treeDisplay.IsDisposed)
                             {
-                                treeDisplay.Clear();
-                                treeDisplay.Text = treeText;
-                                ApplyColorFormatting();
+                                treeDisplay.SuspendLayout();
+                                try
+                                {
+                                    treeDisplay.Clear();
+                                    treeDisplay.Text = treeText;
+                                    ApplyColorFormattingOptimized();
+                                }
+                                finally
+                                {
+                                    treeDisplay.ResumeLayout(true);
+                                    treeDisplay.Refresh();
+                                }
                             }
                         });
                     }
                     return;
                 }
-                
-                // Create rain frame
+
+                // Create dramatic rain frame
                 var rainCanvas = (char[,])currentTree.Clone();
-                
-                // Update and draw rain drops
+
+                // Update and draw enhanced rain drops
                 foreach (var drop in rainDrops)
                 {
                     drop.Y += drop.Speed;
-                    
-                    // Reset drop if it goes off screen
+
+                    // Reset drop if it goes off screen - with varied starting positions
                     if (drop.Y >= TREE_HEIGHT)
                     {
-                        drop.Y = random.Next(-10, -1);
+                        drop.Y = random.Next(-20, -5); // Higher starting position
                         drop.X = random.Next(TREE_WIDTH);
+                        drop.Speed = random.Next(2, 5); // Re-randomize speed
+                        drop.Character = GetRandomRainCharacter(); // New character
+                        drop.Intensity = random.NextDouble(); // New intensity
                     }
-                    
-                    // Draw drop
-                    if (drop.Y >= 0 && drop.Y < TREE_HEIGHT && drop.X >= 0 && drop.X < TREE_WIDTH)
+
+                    // Draw multiple drops per position for intensity
+                    for (int offset = 0; offset < 3; offset++)
                     {
-                        if (rainCanvas[drop.Y, drop.X] == ' ')
+                        int dropY = drop.Y - offset;
+                        if (dropY >= 0 && dropY < TREE_HEIGHT && drop.X >= 0 && drop.X < TREE_WIDTH)
                         {
-                            rainCanvas[drop.Y, drop.X] = '|';
+                            if (rainCanvas[dropY, drop.X] == ' ')
+                            {
+                                // Use different characters based on position for trail effect
+                                char rainChar = offset == 0 ? drop.Character :
+                                              offset == 1 ? '˙' :
+                                              '·';
+                                rainCanvas[dropY, drop.X] = rainChar;
+                            }
                         }
                     }
                 }
-                
-                // Update display
+
+                // Add splash effects at ground level
+                for (int x = 0; x < TREE_WIDTH; x++)
+                {
+                    if (random.NextDouble() > 0.7) // 30% chance of splash
+                    {
+                        int splashY = TREE_HEIGHT - 1;
+                        if (splashY >= 0 && rainCanvas[splashY, x] == ' ')
+                        {
+                            rainCanvas[splashY, x] = random.NextDouble() > 0.5 ? '∶' : '˙';
+                        }
+                    }
+                }
+
+                // Update display with enhanced rendering
                 var rainText = ConvertTreeToString(rainCanvas);
                 SafeInvoke(() =>
                 {
                     if (treeDisplay != null && !treeDisplay.IsDisposed)
                     {
-                        treeDisplay.Clear();
-                        treeDisplay.Text = rainText;
-                        ApplyColorFormatting();
-                        
-                        // Color rain drops blue
-                        string text = treeDisplay.Text;
-                        for (int i = 0; i < text.Length; i++)
+                        treeDisplay.SuspendLayout();
+                        try
                         {
-                            if (text[i] == '|')
-                            {
-                                treeDisplay.SelectionStart = i;
-                                treeDisplay.SelectionLength = 1;
-                                treeDisplay.SelectionColor = Color.FromArgb(100, 149, 237);
-                            }
+                            treeDisplay.Clear();
+                            treeDisplay.Text = rainText;
+
+                            // Apply original tree colors first
+                            ApplyColorFormattingOptimized();
+
+                            // Then apply enhanced rain colors
+                            ApplyEnhancedRainColors();
+                        }
+                        finally
+                        {
+                            treeDisplay.ResumeLayout(true);
+                            treeDisplay.Refresh();
                         }
                     }
                 });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Rain timer error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Enhanced rain timer error: {ex.Message}");
+            }
+        }
+
+        private void ApplyEnhancedRainColors()
+        {
+            try
+            {
+                if (treeDisplay == null || treeDisplay.IsDisposed) return;
+
+                string text = treeDisplay.Text;
+                char[] rainChars = ['|', '¦', '│', '┃', '║', '∣', '⎮', '❘', '˙', '·', '∶'];
+
+                for (int i = 0; i < text.Length; i++)
+                {
+                    char c = text[i];
+                    if (rainChars.Contains(c))
+                    {
+                        treeDisplay.SelectionStart = i;
+                        treeDisplay.SelectionLength = 1;
+
+                        // Enhanced rain colors - blues with intensity variation
+                        Color rainColor = c switch
+                        {
+                            '|' or '¦' or '│' or '┃' or '║' or '∣' or '⎮' or '❘' => Color.FromArgb(52, 152, 219), // Main rain blue
+                            '˙' or '·' => Color.FromArgb(174, 214, 241), // Light splash blue
+                            '∶' => Color.FromArgb(93, 173, 226), // Medium splash blue
+                            _ => Color.FromArgb(52, 152, 219)
+                        };
+
+                        treeDisplay.SelectionColor = rainColor;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Enhanced rain color error: {ex.Message}");
             }
         }
 
@@ -688,6 +914,8 @@ namespace BonsaiTreeGenerator
             public int X { get; set; }
             public int Y { get; set; }
             public int Speed { get; set; }
+            public char Character { get; set; } = '|';
+            public double Intensity { get; set; } = 1.0;
         }
 
         #endregion
@@ -704,9 +932,9 @@ namespace BonsaiTreeGenerator
             try
             {
                 StartRainEffect();
-                
+
                 // Show positive message
-                MessageBox.Show($"{currentStats?.Name ?? "Your bonsai"} loves the water! 💧🌱\n\nYour bonsai is happy and healthy!", 
+                MessageBox.Show($"{currentStats?.Name ?? "Your bonsai"} loves the water! \n\nYour bonsai is happy and healthy!",
                     "Watering Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -720,16 +948,16 @@ namespace BonsaiTreeGenerator
             try
             {
                 string[] killWarnings = [
-                    "NO.", "PAPA WHYYYYY", "What is wrong with you", "Don't you dare!", 
+                    "NO.", "PAPA WHYYYYY", "What is wrong with you", "Don't you dare!",
                     "Why would you do this?!", "I trusted you!", "This is cruel!",
                     "Please reconsider!", "Have mercy!", "Think of the children!",
                     "I had so much to live for!", "But we were just getting to know each other!",
                     "I thought we were friends!", "This is not the way!"
                 ];
-                
+
                 string warning = killWarnings[random.Next(killWarnings.Length)];
-                
-                MessageBox.Show($"{warning}\n\n😢 {currentStats?.Name ?? "Your bonsai"} doesn't want to die!", 
+
+                MessageBox.Show($"{warning}\n\n {currentStats?.Name ?? "Your bonsai"} doesn't want to die!",
                     "Bonsai Plea for Life", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
@@ -744,7 +972,7 @@ namespace BonsaiTreeGenerator
             {
                 if (!isFormReady || treeDisplay?.Text == null || string.IsNullOrEmpty(treeDisplay.Text))
                 {
-                    MessageBox.Show("No bonsai tree to save. Please adopt a bonsai first.", "Save Error", 
+                    MessageBox.Show("No bonsai tree to save. Please adopt a bonsai first.", "Save Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -756,18 +984,18 @@ namespace BonsaiTreeGenerator
                     FileName = $"Bonsai_{currentStats?.Name ?? "Tree"}_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
                     Title = "Save Your Bonsai"
                 };
-                
+
                 if (saveDialog.ShowDialog() == DialogResult.OK)
                 {
                     SetUIGenerating(true);
-                    
+
                     await Task.Run(() =>
                     {
                         var content = CreateSaveContent();
                         File.WriteAllText(saveDialog.FileName, content, Encoding.UTF8);
                     });
-                    
-                    MessageBox.Show($"Your bonsai {currentStats?.Name ?? "tree"} saved successfully to:\n{saveDialog.FileName}", 
+
+                    MessageBox.Show($"Your bonsai {currentStats?.Name ?? "tree"} saved successfully to:\n{saveDialog.FileName}",
                         "Save Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
@@ -789,7 +1017,7 @@ namespace BonsaiTreeGenerator
         {
             var content = new StringBuilder();
             content.AppendLine($"YOUR BONSAI PET: {currentStats?.Name ?? "Unknown"}");
-            content.AppendLine("=" + new string('=', 40));
+            content.AppendLine("=" + new string('=', 105));
             content.AppendLine();
             content.AppendLine(treeDisplay?.Text ?? "");
             content.AppendLine();
@@ -816,49 +1044,9 @@ namespace BonsaiTreeGenerator
                 }
             }
             content.AppendLine();
-            content.AppendLine("INTERACTIVE FEATURES:");
-            content.AppendLine("=" + new string('=', 20));
-            content.AppendLine("• Water your bonsai to see a beautiful rain effect");
-            content.AppendLine("• Your bonsai has unique personality traits");
-            content.AppendLine("• Each bonsai is procedurally generated with authentic characteristics");
-            content.AppendLine("• Proper brown trunk colors and natural green foliage");
-            content.AppendLine("• Horizontal branch layers creating authentic bonsai structure");
-            content.AppendLine("• Dense foliage pads at branch endpoints");
-            content.AppendLine("• Traditional bonsai proportions and styling");
-            content.AppendLine();
-            content.AppendLine("TECHNICAL FEATURES:");
-            content.AppendLine("=" + new string('=', 18));
-            content.AppendLine("• Corrected color mapping for realistic appearance");
-            content.AppendLine("• Maximized window with proper sizing and no scroll bars");
-            content.AppendLine("• Interactive pet simulation with stats and personality");
-            content.AppendLine("• ASCII rain effect animation for watering");
-            content.AppendLine("• Random name generation from authentic Japanese names");
-            content.AppendLine("• Age generation from 1 month to 10 years");
-            content.AppendLine("• Personality traits with likes and dislikes");
-            content.AppendLine("• Emotional responses to user interactions");
-            content.AppendLine();
-            content.AppendLine("BONSAI CARE GUIDE:");
-            content.AppendLine("=" + new string('=', 18));
-            content.AppendLine("• Water regularly to keep your bonsai healthy");
-            content.AppendLine("• Pay attention to your bonsai's likes and dislikes");
-            content.AppendLine("• Each bonsai has a unique personality");
-            content.AppendLine("• Treat your bonsai with love and respect");
-            content.AppendLine("• Enjoy the peaceful art of bonsai cultivation");
-            content.AppendLine();
-            content.AppendLine("TRADITIONAL BONSAI STYLES:");
-            content.AppendLine("=" + new string('=', 26));
-            content.AppendLine("• Formal Upright (Chokkan) - Straight, symmetrical");
-            content.AppendLine("• Informal Upright (Moyogi) - Natural curves");
-            content.AppendLine("• Windswept (Fukinagashi) - Wind-blown appearance");
-            content.AppendLine("• Cascade (Kengai) - Waterfall style");
-            content.AppendLine("• Slanting (Shakan) - Leaning trunk");
-            content.AppendLine();
-            content.AppendLine("Generated on: 2025-06-23 01:16:31 UTC for user: cs121287");
-            content.AppendLine("Created with Interactive Bonsai Pet Generator");
-            content.AppendLine("Featuring corrected colors, proper sizing, and interactive features");
-            content.AppendLine("Your virtual bonsai companion with personality and charm");
-            content.AppendLine("Experience the zen of digital bonsai cultivation");
-            
+            content.AppendLine("C. Saunders - 2025");
+            content.AppendLine("personal Bonsai Tree Generator");
+
             return content.ToString();
         }
 
@@ -880,7 +1068,7 @@ namespace BonsaiTreeGenerator
                 if (generateButton != null && !generateButton.IsDisposed && generateButton.IsHandleCreated)
                 {
                     generateButton.Enabled = !generating;
-                    generateButton.Text = generating ? "🌱 Growing..." : "🌱 Adopt New Bonsai";
+                    generateButton.Text = generating ? "Growing..." : "Adopt New Bonsai";
                 }
 
                 if (saveButton != null && !saveButton.IsDisposed && saveButton.IsHandleCreated)
@@ -905,7 +1093,7 @@ namespace BonsaiTreeGenerator
             {
                 if (statusLabel != null && !statusLabel.IsDisposed && statusLabel.IsHandleCreated)
                 {
-                    statusLabel.Text = "Generated on: 2025-06-23 01:34:31 UTC";
+                    statusLabel.Text = "C. Saunders - 2025";
                 }
             });
         }
@@ -915,7 +1103,7 @@ namespace BonsaiTreeGenerator
             try
             {
                 if (!isFormReady) return;
-                
+
                 if (InvokeRequired)
                 {
                     try
@@ -962,21 +1150,22 @@ namespace BonsaiTreeGenerator
             try
             {
                 isFormReady = false;
-                
+
                 // Stop rain timer
                 rainTimer?.Stop();
                 rainTimer?.Dispose();
-                
+
                 cancellationTokenSource?.Cancel();
                 Thread.Sleep(100);
-                
+
                 cancellationTokenSource?.Dispose();
-                
+
                 // Dispose UI components
                 treeDisplay?.Dispose();
                 treePanel?.Dispose();
                 statsPanel?.Dispose();
                 statsDisplay?.Dispose();
+                buttonPanel?.Dispose();
                 generateButton?.Dispose();
                 saveButton?.Dispose();
                 waterButton?.Dispose();
@@ -984,7 +1173,7 @@ namespace BonsaiTreeGenerator
                 statusLabel?.Dispose();
                 progressBar?.Dispose();
                 mainContainer?.Dispose();
-                
+
                 disposed = true;
             }
             catch (Exception ex)
@@ -997,7 +1186,10 @@ namespace BonsaiTreeGenerator
         {
             if (!disposed && disposing)
             {
-                if (components != null)
+                if (components == null)
+                {
+                }
+                else
                 {
                     components.Dispose();
                 }

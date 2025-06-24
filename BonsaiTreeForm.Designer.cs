@@ -23,7 +23,7 @@ namespace BonsaiTreeGenerator
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new Size(1200, 800);
             this.Name = "BonsaiTreeForm";
-            this.Text = "Realistic Procedural 2D Bonsai Tree Generator - Interactive Pet Edition";
+            this.Text = "Personal Bonsai Tree Generator";
             this.WindowState = FormWindowState.Maximized;
             this.ResumeLayout(false);
         }
